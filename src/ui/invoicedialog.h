@@ -2,6 +2,7 @@
 #include <QDialog>
 #include <QComboBox>
 #include <QDoubleSpinBox>
+#include <QSpinBox>
 #include <QTableWidget>
 #include <QPushButton>
 #include <QLabel>
@@ -27,6 +28,7 @@ private:
 
     QComboBox *cmbCliente;
     QComboBox *cmbProducto;
+    QSpinBox *spnCantidad;
     QTableWidget *tablaItems;
     QLabel *lblSubtotal;
     QLabel *lblDescuento;

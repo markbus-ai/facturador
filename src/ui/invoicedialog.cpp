@@ -56,9 +56,17 @@ InvoiceDialog::InvoiceDialog(BillingController &billing, int userId,
     productRow->addWidget(cmbProducto, 1);
     lblProducto->setBuddy(cmbProducto);
 
+    spnCantidad = new QSpinBox();
+    spnCantidad->setRange(1, 999999);
+    spnCantidad->setValue(1);
+    spnCantidad->setMinimumWidth(70);
+    productRow->addWidget(new QLabel("Cant:"));
+    productRow->addWidget(spnCantidad);
+
     QPushButton *btnAddItem = new QPushButton("Agregar a Factura");
     btnAddItem->setObjectName("btnPrimary");
     btnAddItem->setCursor(Qt::PointingHandCursor);
+    btnAddItem->setAutoDefault(false);
     connect(btnAddItem, &QPushButton::clicked, this,
             &InvoiceDialog::addItemRow);
     productRow->addWidget(btnAddItem);
@@ -84,6 +92,7 @@ InvoiceDialog::InvoiceDialog(BillingController &billing, int userId,
     QPushButton *btnRemove = new QPushButton("Quitar Item");
     btnRemove->setObjectName("btnDanger");
     btnRemove->setCursor(Qt::PointingHandCursor);
+    btnRemove->setAutoDefault(false);
     connect(btnRemove, &QPushButton::clicked, this,
             &InvoiceDialog::removeItemRow);
     itemBtnRow->addWidget(btnRemove);
@@ -211,8 +220,10 @@ InvoiceDialog::InvoiceDialog(BillingController &billing, int userId,
     btnGuardar->setObjectName("btnPrimary");
     btnGuardar->setCursor(Qt::PointingHandCursor);
     btnGuardar->setMinimumWidth(140);
+    btnGuardar->setDefault(true);
     QPushButton *btnCancelar = new QPushButton("Cancelar");
     btnCancelar->setCursor(Qt::PointingHandCursor);
+    btnCancelar->setAutoDefault(false);
     connect(btnGuardar, &QPushButton::clicked, this,
             &InvoiceDialog::saveInvoice);
     connect(btnCancelar, &QPushButton::clicked, this, [this]() {
@@ -251,7 +262,7 @@ void InvoiceDialog::addItemRow() {
 
     int col = 0;
     tablaItems->setItem(row, col++, new QTableWidgetItem(selected.name));
-    QTableWidgetItem *qtyItem = new QTableWidgetItem("1");
+    QTableWidgetItem *qtyItem = new QTableWidgetItem(QString::number(spnCantidad->value()));
     qtyItem->setFlags(qtyItem->flags() | Qt::ItemIsEditable);
     if (!m_qtyValidator)
         m_qtyValidator = new QIntValidator(1, 999999, this);
@@ -259,14 +270,16 @@ void InvoiceDialog::addItemRow() {
     tablaItems->setItem(row, col++, qtyItem);
     tablaItems->setItem(row, col++,
         new QTableWidgetItem(QString("$%1").arg(selected.price, 0, 'f', 2)));
-    tablaItems->setItem(row, col++,
-        new QTableWidgetItem(QString("$%1").arg(selected.price, 0, 'f', 2)));
     QTableWidgetItem *tipoItem = new QTableWidgetItem();
     tipoItem->setData(Qt::UserRole, "none");
     tablaItems->setItem(row, col++, tipoItem);
-    tablaItems->setItem(row, col++, new QTableWidgetItem("0"));
-    tablaItems->setItem(row, col++,
-        new QTableWidgetItem(QString::number(selected.id)));
+    QTableWidgetItem *valItem = new QTableWidgetItem("0");
+    valItem->setData(Qt::UserRole, 0.0);
+    tablaItems->setItem(row, col++, valItem);
+    QTableWidgetItem *idItem = new QTableWidgetItem(QString::number(selected.id));
+    tablaItems->setItem(row, col++, idItem);
+
+    spnCantidad->setValue(1);
 
     m_cellChangedConn = connect(tablaItems, &QTableWidget::cellChanged, this,
             [this](int r, int c) {
