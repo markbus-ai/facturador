@@ -255,6 +255,23 @@ void InvoiceDialog::addItemRow() {
     }
     if (!found) return;
 
+    int requestedQty = spnCantidad->value();
+    int existingQty = 0;
+    for (int i = 0; i < tablaItems->rowCount(); i++) {
+        QTableWidgetItem *idItem = tablaItems->item(i, 6);
+        if (idItem && idItem->text().toInt() == selected.id) {
+            QTableWidgetItem *qtyItem = tablaItems->item(i, 1);
+            if (qtyItem) existingQty += qtyItem->text().toInt();
+        }
+    }
+
+    if (existingQty + requestedQty > selected.stock) {
+        QMessageBox::warning(this, "Stock insuficiente",
+            QString("Stock insuficiente. Disponible: %1 (Ya tienes %2 en la factura)")
+                .arg(selected.stock).arg(existingQty));
+        return;
+    }
+
     disconnect(m_cellChangedConn);
 
     int row = tablaItems->rowCount();

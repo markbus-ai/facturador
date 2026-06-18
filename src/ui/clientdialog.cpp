@@ -55,12 +55,14 @@ void ClientDialog::setupUi(bool editing) {
 
     QPushButton *btnCancel = new QPushButton("Cancelar");
     btnCancel->setCursor(Qt::PointingHandCursor);
+    btnCancel->setAutoDefault(false);
     connect(btnCancel, &QPushButton::clicked, this, &QDialog::reject);
     btnRow->addWidget(btnCancel);
 
     QPushButton *btnSave = new QPushButton(editing ? "Guardar Cambios" : "Crear Cliente");
     btnSave->setObjectName("btnPrimary");
     btnSave->setCursor(Qt::PointingHandCursor);
+    btnSave->setDefault(true);
     connect(btnSave, &QPushButton::clicked, this, [this]() {
         if (m_name->text().trimmed().isEmpty()) {
             QMessageBox::warning(this, "Validacion",
