@@ -8,6 +8,7 @@
 #include <QSqlQuery>
 #include <QSqlError>
 #include <QDebug>
+#include <QtGlobal>
 
 InvoiceService::InvoiceService(const IAccessContract &access)
     : m_access(access) {}
@@ -34,6 +35,9 @@ Result InvoiceService::submitInvoice(int clientId, int userId,
     if (!itemsResult.success) return itemsResult;
 
     InvoiceTotals totals = InvoiceCalculator::calculateBoth(items, *discount);
+
+    if (totals.total > 99999999.99)
+        return Result::fail("El total de la factura supera el l\u00edmite permitido");
 
     auto &db = DatabaseManager::instance().database();
     db.transaction();
@@ -71,6 +75,9 @@ Result InvoiceService::submitInvoice(int clientId, int userId,
 
 Result InvoiceService::validateItems(const QList<InvoiceItem> &items) const {
     for (const auto &item : items) {
+        if (!Validation::isIdValid(item.productId))
+            return Result::fail("ID de producto inv\u00e1lido en uno de los items");
+
         if (!Validation::isNotEmpty(item.productName))
             return Result::fail("Todos los items deben tener descripci\u00f3n");
 
@@ -89,6 +96,10 @@ Result InvoiceService::validateItems(const QList<InvoiceItem> &items) const {
 
         if (item.discountType == "nominal" && item.discountValue < 0)
             return Result::fail("El descuento fijo no puede ser negativo");
+
+        auto prodResult = ProductRepository::instance().findById(item.productId);
+        if (!prodResult.success)
+            return Result::fail("Producto no encontrado: " + item.productName);
     }
     return Result::ok();
 }
@@ -96,6 +107,12 @@ Result InvoiceService::validateItems(const QList<InvoiceItem> &items) const {
 Result InvoiceService::deductStock(const QList<InvoiceItem> &items) {
     auto &db = DatabaseManager::instance().database();
     for (const auto &item : items) {
+        QSqlQuery lockQ(db);
+        lockQ.prepare("SELECT stock FROM products WHERE id = ? FOR UPDATE");
+        lockQ.addBindValue(item.productId);
+        if (!lockQ.exec() || !lockQ.next())
+            return Result::fail("Producto no encontrado: " + item.productName);
+
         QSqlQuery q(db);
         q.prepare("UPDATE products SET stock = stock - ? WHERE id = ? AND stock >= ?");
         q.addBindValue(item.quantity);
@@ -106,12 +123,8 @@ Result InvoiceService::deductStock(const QList<InvoiceItem> &items) {
             return Result::fail("Error al actualizar stock");
         }
         if (q.numRowsAffected() == 0) {
-            auto prodResult = ProductRepository::instance().findById(item.productId);
-            if (!prodResult.success)
-                return Result::fail("Producto no encontrado: " + item.productName);
             return Result::fail("Stock insuficiente para " + item.productName +
-                                " (disponible: " + QString::number(prodResult.value.stock) +
-                                ", solicitado: " + QString::number(item.quantity) + ")");
+                                " (solicitado: " + QString::number(item.quantity) + ")");
         }
     }
     return Result::ok();

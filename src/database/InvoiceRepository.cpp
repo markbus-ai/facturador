@@ -66,10 +66,13 @@ QList<Invoice> InvoiceRepository::all() {
                       placeholders.join(",") + ")");
         for (int id : invoiceIds)
             itemQ.addBindValue(id);
-        itemQ.exec();
-        while (itemQ.next()) {
-            int invoiceId = itemQ.value("invoice_id").toInt();
-            list[idToIndex[invoiceId]].items.append(rowToItem(itemQ));
+        if (itemQ.exec()) {
+            while (itemQ.next()) {
+                int invoiceId = itemQ.value("invoice_id").toInt();
+                list[idToIndex[invoiceId]].items.append(rowToItem(itemQ));
+            }
+        } else {
+            qDebug() << "Error cargando items:" << itemQ.lastError().text();
         }
     }
 
@@ -109,10 +112,13 @@ QList<Invoice> InvoiceRepository::byUser(int userId) {
                       placeholders.join(",") + ")");
         for (int id : invoiceIds)
             itemQ.addBindValue(id);
-        itemQ.exec();
-        while (itemQ.next()) {
-            int invoiceId = itemQ.value("invoice_id").toInt();
-            list[idToIndex[invoiceId]].items.append(rowToItem(itemQ));
+        if (itemQ.exec()) {
+            while (itemQ.next()) {
+                int invoiceId = itemQ.value("invoice_id").toInt();
+                list[idToIndex[invoiceId]].items.append(rowToItem(itemQ));
+            }
+        } else {
+            qDebug() << "Error cargando items:" << itemQ.lastError().text();
         }
     }
 
@@ -137,9 +143,12 @@ ResultOr<Invoice> InvoiceRepository::findById(int id) {
     QSqlQuery itemQ(db);
     itemQ.prepare("SELECT * FROM invoice_items WHERE invoice_id = ?");
     itemQ.addBindValue(inv.id);
-    itemQ.exec();
-    while (itemQ.next())
-        inv.items.append(rowToItem(itemQ));
+    if (!itemQ.exec()) {
+        qDebug() << "Error cargando items:" << itemQ.lastError().text();
+    } else {
+        while (itemQ.next())
+            inv.items.append(rowToItem(itemQ));
+    }
 
     return {true, {}, inv};
 }
@@ -199,6 +208,8 @@ Result InvoiceRepository::remove(int id) {
         qDebug() << "Error eliminando factura:" << q.lastError().text();
         return Result::fail("Error al eliminar la factura");
     }
+    if (q.numRowsAffected() == 0)
+        return Result::fail("Factura no encontrada");
 
     return Result::ok();
 }

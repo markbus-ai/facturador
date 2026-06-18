@@ -30,7 +30,11 @@ UserWindow::UserWindow(const QString &username, int userId,
     btnNuevaFactura->setObjectName("btnPrimary");
     btnNuevaFactura->setCursor(Qt::PointingHandCursor);
     connect(btnNuevaFactura, &QPushButton::clicked, this,
-            &UserWindow::showNewInvoiceDialog);
+            [this]() {
+        btnNuevaFactura->setEnabled(false);
+        showNewInvoiceDialog();
+        btnNuevaFactura->setEnabled(true);
+    });
     btnRow->addWidget(btnNuevaFactura);
     btnRow->addStretch();
     layout->addLayout(btnRow);
@@ -42,21 +46,21 @@ UserWindow::UserWindow(const QString &username, int userId,
     tablaFacturas->horizontalHeader()->setStretchLastSection(true);
     tablaFacturas->setEditTriggers(QAbstractItemView::NoEditTriggers);
     tablaFacturas->setSelectionBehavior(QAbstractItemView::SelectRows);
-    tablaFacturas->setAlternatingRowColors(true);
+    tablaFacturas->setAlternatingRowColors(false);
     layout->addWidget(tablaFacturas);
 
     QLabel *lblProd = new QLabel("Productos disponibles");
     lblProd->setStyleSheet("font-size: 14px; font-weight: 500; margin-top: 12px; color: #1d1d1f;");
     layout->addWidget(lblProd);
 
-    tablaProductos = new QTableWidget(0, 4, this);
+    tablaProductos = new QTableWidget(0, 5, this);
     tablaProductos->setHorizontalHeaderLabels(
-        {"ID", "Nombre", "Precio", "Stock"});
+        {"ID", "Nombre", "Precio", "Stock", "Proveedor"});
     tablaProductos->setAccessibleName("Productos disponibles");
     tablaProductos->horizontalHeader()->setStretchLastSection(true);
     tablaProductos->setEditTriggers(QAbstractItemView::NoEditTriggers);
     tablaProductos->setSelectionBehavior(QAbstractItemView::SelectRows);
-    tablaProductos->setAlternatingRowColors(true);
+    tablaProductos->setAlternatingRowColors(false);
     layout->addWidget(tablaProductos);
 
     QHBoxLayout *bottomRow = new QHBoxLayout();
@@ -127,6 +131,8 @@ void UserWindow::loadProducts() {
                 QString("$%1").arg(p.price, 0, 'f', 2)));
         tablaProductos->setItem(
             row, 3, new QTableWidgetItem(QString::number(p.stock)));
+        tablaProductos->setItem(
+            row, 4, new QTableWidgetItem(p.supplierName));
     }
 }
 

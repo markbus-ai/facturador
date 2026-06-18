@@ -6,6 +6,7 @@
 #include <QApplication>
 #include <QMessageBox>
 #include <QTimer>
+#include <QPointer>
 #include <functional>
 
 static const char *STYLESHEET = R"(
@@ -44,7 +45,6 @@ static const char *STYLESHEET = R"(
         outline: none;
         selection-background-color: #e8f0fe;
         selection-color: #1d1d1f;
-        alternate-background-color: #fafafc;
     }
     QTableWidget::item {
         padding: 6px 10px;
@@ -53,9 +53,6 @@ static const char *STYLESHEET = R"(
     QTableWidget::item:selected {
         background: #e8f0fe;
         color: #1d1d1f;
-    }
-    QTableWidget::item:alternate {
-        background: #fafafc;
     }
     QHeaderView::section {
         background: #f5f5f7;
@@ -245,7 +242,8 @@ int main(int argc, char *argv[]) {
     }
 
     std::function<void()> startSession;
-    startSession = [&app, &startSession]() {
+    QPointer<QWidget> mainWindowGuard;
+    startSession = [&app, &mainWindowGuard, &startSession]() {
         LoginWindow login;
         if (login.exec() != QDialog::Accepted) {
             app.quit();
@@ -257,6 +255,7 @@ int main(int argc, char *argv[]) {
         const QString &username = login.username();
 
         QWidget *w = nullptr;
+        mainWindowGuard.clear();
         if (role == "admin")
             w = new AdminWindow(username, userId);
         else if (role == "repositor")
@@ -264,11 +263,20 @@ int main(int argc, char *argv[]) {
         else
             w = new UserWindow(username, userId);
 
-        w->setAttribute(Qt::WA_DeleteOnClose);
+        if (!w) {
+            QMessageBox::critical(nullptr, "Error",
+                "No se pudo determinar el rol del usuario");
+            app.quit();
+            return;
+        }
 
-        auto onLogout = [&app, &startSession, w]() {
+        w->setAttribute(Qt::WA_DeleteOnClose);
+        mainWindowGuard = w;
+
+        QPointer<QWidget> wGuard(w);
+        auto onLogout = [&app, &startSession, wGuard]() {
             app.setQuitOnLastWindowClosed(false);
-            w->close();
+            if (wGuard) wGuard->close();
             QTimer::singleShot(0, [&app, &startSession]() {
                 app.setQuitOnLastWindowClosed(true);
                 startSession();

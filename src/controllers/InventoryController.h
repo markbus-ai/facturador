@@ -11,7 +11,7 @@ public:
     QList<Product> allProducts();
     ResultOr<Product> findProduct(int id);
     Result addProduct(const QString &name, const QString &description,
-                      double price, int stock, int minStock);
+                      double price, int stock, int minStock, int supplierId = 0);
     Result updateProduct(const Product &product);
     Result removeProduct(int id);
     QList<Product> lowStockReport();

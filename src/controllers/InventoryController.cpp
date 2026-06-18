@@ -12,6 +12,8 @@ QList<Product> InventoryController::allProducts() {
 }
 
 ResultOr<Product> InventoryController::findProduct(int id) {
+    if (!m_access.canQueryProducts())
+        return {false, "No tiene permisos para consultar productos", Product{}};
     if (!Validation::isIdValid(id))
         return {false, "ID de producto inv\u00e1lido", Product{}};
     return ProductRepository::instance().findById(id);
@@ -19,7 +21,8 @@ ResultOr<Product> InventoryController::findProduct(int id) {
 
 Result InventoryController::addProduct(const QString &name,
                                        const QString &description,
-                                       double price, int stock, int minStock) {
+                                       double price, int stock, int minStock,
+                                       int supplierId) {
     if (!m_access.canManageProducts())
         return Result::fail("No tiene permisos para gestionar productos");
 
@@ -47,6 +50,7 @@ Result InventoryController::addProduct(const QString &name,
     p.price = price;
     p.stock = stock;
     p.minStock = minStock;
+    p.supplierId = supplierId;
     return ProductRepository::instance().save(p);
 }
 

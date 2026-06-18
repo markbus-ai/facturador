@@ -4,6 +4,8 @@
 #include <QHeaderView>
 #include <QFrame>
 #include <QMetaObject>
+#include <QIntValidator>
+#include <QtGlobal>
 
 InvoiceDialog::InvoiceDialog(BillingController &billing, int userId,
                              QWidget *parent)
@@ -29,7 +31,8 @@ InvoiceDialog::InvoiceDialog(BillingController &billing, int userId,
     auto clients = m_billing.allClients();
     for (const auto &c : clients)
         cmbCliente->addItem(c.name, c.id);
-    cmbCliente->setCurrentIndex(0);
+    if (cmbCliente->count() > 0)
+        cmbCliente->setCurrentIndex(0);
     clientRow->addWidget(lblCliente);
     clientRow->addWidget(cmbCliente, 1);
     mainLayout->addLayout(clientRow);
@@ -69,7 +72,7 @@ InvoiceDialog::InvoiceDialog(BillingController &billing, int userId,
     tablaItems->horizontalHeader()->setStretchLastSection(true);
     tablaItems->setEditTriggers(QAbstractItemView::NoEditTriggers);
     tablaItems->setSelectionBehavior(QAbstractItemView::SelectRows);
-    tablaItems->setAlternatingRowColors(true);
+    tablaItems->setAlternatingRowColors(false);
     tablaItems->setColumnWidth(4, 90);
     tablaItems->setColumnWidth(5, 80);
     tablaItems->setColumnHidden(6, true);
@@ -148,19 +151,26 @@ InvoiceDialog::InvoiceDialog(BillingController &billing, int userId,
                 }
                 int row = tablaItems->currentRow();
                 if (row >= 0) {
-                    tablaItems->item(row, 4)->setData(Qt::UserRole, tipo);
-                    tablaItems->item(row, 5)->setText(
-                        QString::number(spnItemValorDesc->value(), 'f', 2));
-                    updateTotals();
+                    QTableWidgetItem *tipoItem = tablaItems->item(row, 4);
+                    QTableWidgetItem *valItem = tablaItems->item(row, 5);
+                    if (tipoItem && valItem) {
+                        tipoItem->setData(Qt::UserRole, tipo);
+                        valItem->setText(
+                            QString::number(spnItemValorDesc->value(), 'f', 2));
+                        updateTotals();
+                    }
                 }
             });
     connect(spnItemValorDesc, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
-            this, [this]() {
+            this,             [this]() {
                 int row = tablaItems->currentRow();
                 if (row >= 0) {
-                    tablaItems->item(row, 5)->setText(
-                        QString::number(spnItemValorDesc->value(), 'f', 2));
-                    updateTotals();
+                    QTableWidgetItem *item = tablaItems->item(row, 5);
+                    if (item) {
+                        item->setText(
+                            QString::number(spnItemValorDesc->value(), 'f', 2));
+                        updateTotals();
+                    }
                 }
             });
     itemLay->addWidget(cmbItemTipoDesc);
@@ -243,6 +253,9 @@ void InvoiceDialog::addItemRow() {
     tablaItems->setItem(row, col++, new QTableWidgetItem(selected.name));
     QTableWidgetItem *qtyItem = new QTableWidgetItem("1");
     qtyItem->setFlags(qtyItem->flags() | Qt::ItemIsEditable);
+    if (!m_qtyValidator)
+        m_qtyValidator = new QIntValidator(1, 999999, this);
+    qtyItem->setData(Qt::UserRole + 1, QVariant::fromValue(m_qtyValidator));
     tablaItems->setItem(row, col++, qtyItem);
     tablaItems->setItem(row, col++,
         new QTableWidgetItem(QString("$%1").arg(selected.price, 0, 'f', 2)));
@@ -257,7 +270,19 @@ void InvoiceDialog::addItemRow() {
 
     m_cellChangedConn = connect(tablaItems, &QTableWidget::cellChanged, this,
             [this](int r, int c) {
-                if (c == 1) updateTotals();
+                if (c == 1) {
+                    QTableWidgetItem *item = tablaItems->item(r, c);
+                    if (item) {
+                        bool ok = false;
+                        int val = item->text().toInt(&ok);
+                        if (!ok || val < 1) {
+                            item->setBackground(QBrush(QColor("#ffd1cf")));
+                        } else {
+                            item->setBackground(QBrush(Qt::transparent));
+                        }
+                    }
+                    updateTotals();
+                }
             });
 
     tablaItems->setCurrentCell(row, 0);
@@ -268,6 +293,12 @@ void InvoiceDialog::addItemRow() {
 void InvoiceDialog::removeItemRow() {
     int row = tablaItems->currentRow();
     if (row >= 0 && tablaItems->rowCount() > 0) {
+        QTableWidgetItem *nameItem = tablaItems->item(row, 0);
+        QString prodName = nameItem ? nameItem->text() : "item";
+        if (QMessageBox::question(this, "Confirmar",
+                QString("\u00bfEliminar '%1' de la factura?").arg(prodName),
+                QMessageBox::Yes | QMessageBox::No) == QMessageBox::No)
+            return;
         disconnect(m_cellChangedConn);
         tablaItems->removeRow(row);
         m_cellChangedConn = connect(tablaItems, &QTableWidget::cellChanged, this,
@@ -289,8 +320,11 @@ void InvoiceDialog::syncItemDiscountControls() {
     cmbItemTipoDesc->setEnabled(true);
     spnItemValorDesc->setEnabled(true);
 
-    QString tipo = tablaItems->item(row, 4)->data(Qt::UserRole).toString();
-    double valor = tablaItems->item(row, 5)->text().toDouble();
+    QTableWidgetItem *tipoItem = tablaItems->item(row, 4);
+    QTableWidgetItem *valItem = tablaItems->item(row, 5);
+    if (!tipoItem || !valItem) return;
+    QString tipo = tipoItem->data(Qt::UserRole).toString();
+    double valor = valItem->text().toDouble();
 
     int idx = cmbItemTipoDesc->findData(tipo);
     cmbItemTipoDesc->blockSignals(true);
@@ -316,19 +350,28 @@ void InvoiceDialog::updateTotals() {
     double sumConDesc = 0.0;
 
     for (int i = 0; i < tablaItems->rowCount(); i++) {
-        int qty = tablaItems->item(i, 1)->text().toInt();
+        QTableWidgetItem *qtyItem = tablaItems->item(i, 1);
+        QTableWidgetItem *priceItem = tablaItems->item(i, 2);
+        QTableWidgetItem *tipoItem = tablaItems->item(i, 4);
+        QTableWidgetItem *descItem = tablaItems->item(i, 5);
+        if (!qtyItem || !priceItem) continue;
+
+        int qty = qtyItem->text().toInt();
         if (qty < 1) qty = 1;
-        QString ps = tablaItems->item(i, 2)->text();
-        ps.remove('$');
-        double price = ps.toDouble();
+        QString ps = priceItem->text();
+        ps.remove(QChar('$'));
+        ps.replace(',', '.');
+        bool priceOk = false;
+        double price = ps.toDouble(&priceOk);
+        if (!priceOk || price < 0) price = 0;
         double lineTotal = qty * price;
         subtotalSinDesc += lineTotal;
 
-        QString tipo = tablaItems->item(i, 4)->data(Qt::UserRole).toString();
-        double descValor = tablaItems->item(i, 5)->text().toDouble();
+        QString tipo = tipoItem ? tipoItem->data(Qt::UserRole).toString() : "none";
+        double descValor = descItem ? descItem->text().toDouble() : 0.0;
         double finalLine = lineTotal;
         if (tipo == "percentage")
-            finalLine = lineTotal * (1.0 - descValor / 100.0);
+            finalLine = lineTotal * (1.0 - qBound(0.0, descValor, 100.0) / 100.0);
         else if (tipo == "nominal")
             finalLine = std::max(0.0, lineTotal - descValor);
 
@@ -373,12 +416,26 @@ void InvoiceDialog::saveInvoice() {
         return;
     }
 
+    if (cmbCliente->count() == 0) {
+        QMessageBox::warning(this, "Error", "No hay clientes disponibles");
+        return;
+    }
+
     QList<InvoiceItem> items;
     for (int i = 0; i < tablaItems->rowCount(); i++) {
+        QTableWidgetItem *nameItem = tablaItems->item(i, 0);
+        QTableWidgetItem *qtyItem = tablaItems->item(i, 1);
+        QTableWidgetItem *priceItem = tablaItems->item(i, 2);
+        QTableWidgetItem *tipoItem = tablaItems->item(i, 4);
+        QTableWidgetItem *descItem = tablaItems->item(i, 5);
+        QTableWidgetItem *prodIdItem = tablaItems->item(i, 6);
+
+        if (!nameItem || !qtyItem || !priceItem || !prodIdItem) continue;
+
         InvoiceItem item;
-        item.productId = tablaItems->item(i, 6)->text().toInt();
-        item.productName = tablaItems->item(i, 0)->text();
-        item.quantity = tablaItems->item(i, 1)->text().toInt();
+        item.productId = prodIdItem->text().toInt();
+        item.productName = nameItem->text();
+        item.quantity = qtyItem->text().toInt();
 
         if (item.quantity <= 0) {
             QMessageBox::warning(this, "Error",
@@ -386,13 +443,14 @@ void InvoiceDialog::saveInvoice() {
             return;
         }
 
-        QString priceStr = tablaItems->item(i, 2)->text();
-        priceStr.remove('$');
+        QString priceStr = priceItem->text();
+        priceStr.remove(QChar('$'));
+        priceStr.replace(',', '.');
         item.unitPrice = priceStr.toDouble();
         item.subtotal = item.quantity * item.unitPrice;
 
-        item.discountType = tablaItems->item(i, 4)->data(Qt::UserRole).toString();
-        item.discountValue = tablaItems->item(i, 5)->text().toDouble();
+        item.discountType = tipoItem ? tipoItem->data(Qt::UserRole).toString() : "none";
+        item.discountValue = descItem ? descItem->text().toDouble() : 0.0;
 
         items.append(item);
     }

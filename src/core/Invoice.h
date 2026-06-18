@@ -13,7 +13,7 @@ struct InvoiceItem {
 
     double discountedSubtotal() const {
         if (discountType == "percentage")
-            return subtotal * (1.0 - discountValue / 100.0);
+            return qMax(0.0, subtotal * (1.0 - discountValue / 100.0));
         if (discountType == "nominal")
             return qMax(0.0, subtotal - discountValue);
         return subtotal;

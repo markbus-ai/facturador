@@ -3,6 +3,7 @@
 #include <QSqlQuery>
 #include <QSqlError>
 #include <QCryptographicHash>
+#include <QRandomGenerator>
 #include <QDebug>
 
 UserRepository &UserRepository::instance() {
@@ -18,6 +19,19 @@ UserData UserRepository::rowToUser(const QSqlQuery &q) const {
     return u;
 }
 
+static QString saltedHash(const QString &password, const QString &salt) {
+    QByteArray data = (salt + password).toUtf8();
+    return QString(QCryptographicHash::hash(data, QCryptographicHash::Sha256).toHex());
+}
+
+static QString generateSalt() {
+    QByteArray salt;
+    salt.resize(16);
+    for (int i = 0; i < 16; ++i)
+        salt[i] = static_cast<char>(QRandomGenerator::global()->bounded(256));
+    return QString(salt.toHex());
+}
+
 Result UserRepository::registerUser(const QString &username,
                                     const QString &password,
                                     const QString &role) {
@@ -29,13 +43,14 @@ Result UserRepository::registerUser(const QString &username,
     if (q.next())
         return Result::fail("El nombre de usuario ya existe");
 
-    QByteArray hash = QCryptographicHash::hash(password.toUtf8(),
-                                               QCryptographicHash::Sha256);
+    QString salt = generateSalt();
+    QString hash = saltedHash(password, salt);
     QSqlQuery ins(db);
-    ins.prepare("INSERT INTO users (username, password, role) VALUES (?, ?, ?)");
+    ins.prepare("INSERT INTO users (username, password, role, salt) VALUES (?, ?, ?, ?)");
     ins.addBindValue(username);
-    ins.addBindValue(QString(hash.toHex()));
+    ins.addBindValue(hash);
     ins.addBindValue(role);
+    ins.addBindValue(salt);
 
     if (!ins.exec()) {
         qDebug() << "Error registrando usuario:" << ins.lastError().text();
@@ -48,18 +63,25 @@ ResultOr<UserData> UserRepository::validateUser(const QString &username,
                                                 const QString &password) {
     auto &db = DatabaseManager::instance().database();
     QSqlQuery q(db);
-    q.prepare("SELECT id, username, password, role FROM users WHERE username = ?");
+    q.prepare("SELECT id, username, password, role, salt FROM users WHERE username = ?");
     q.addBindValue(username);
 
     if (!q.exec() || !q.next())
-        return {false, "Usuario o contraseña incorrectos", UserData{}};
+        return {false, "Usuario o contrase\u00f1a incorrectos", UserData{}};
 
     QString storedHash = q.value("password").toString();
-    QByteArray inputHash = QCryptographicHash::hash(
-        password.toUtf8(), QCryptographicHash::Sha256);
+    QString salt = q.value("salt").toString();
 
-    if (storedHash != QString(inputHash.toHex()))
-        return {false, "Usuario o contraseña incorrectos", UserData{}};
+    QString inputHash;
+    if (salt.isEmpty()) {
+        inputHash = QString(QCryptographicHash::hash(
+            password.toUtf8(), QCryptographicHash::Sha256).toHex());
+    } else {
+        inputHash = saltedHash(password, salt);
+    }
+
+    if (storedHash != inputHash)
+        return {false, "Usuario o contrase\u00f1a incorrectos", UserData{}};
 
     UserData u;
     u.id = q.value("id").toInt();

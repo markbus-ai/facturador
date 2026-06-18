@@ -40,11 +40,17 @@ Result AuthController::registerUser(const QString &username,
     if (password != confirmPassword)
         return Result::fail("Las contrase\u00f1as no coinciden");
 
-    if (password.length() < 4)
-        return Result::fail("La contrase\u00f1a debe tener al menos 4 caracteres");
+    if (!Validation::isLengthInRange(password, 8, 64))
+        return Result::fail("La contrase\u00f1a debe tener entre 8 y 64 caracteres");
 
-    if (password.length() > 64)
-        return Result::fail("La contrase\u00f1a no puede superar los 64 caracteres");
+    bool hasUpper = false, hasLower = false, hasDigit = false;
+    for (const QChar &c : password) {
+        if (c.isUpper()) hasUpper = true;
+        if (c.isLower()) hasLower = true;
+        if (c.isDigit()) hasDigit = true;
+    }
+    if (!hasUpper || !hasLower || !hasDigit)
+        return Result::fail("La contrase\u00f1a debe tener may\u00fasculas, min\u00fasculas y n\u00fameros");
 
     QString actualRole = role.isEmpty() ? "user" : role;
     if (!Validation::isValidRole(actualRole))

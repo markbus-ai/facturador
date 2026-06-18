@@ -1,4 +1,5 @@
 #include "repositorwindow.h"
+#include "supplierdialog.h"
 #include <QHeaderView>
 #include <QInputDialog>
 #include <QMessageBox>
@@ -9,18 +10,65 @@ RepositorWindow::RepositorWindow(const QString &username, int userId,
     : QMainWindow(parent), m_username(username), m_userId(userId) {
     setWindowTitle("Facturador — " + username);
     setAccessibleName("Panel de repositor");
-    resize(900, 650);
+    resize(950, 700);
 
     m_access = std::make_unique<RepositorAccess>();
     m_inventory = std::make_unique<InventoryController>(*m_access);
+    m_suppliers = std::make_unique<SupplierController>(*m_access);
 
     QWidget *central = new QWidget(this);
-    QVBoxLayout *layout = new QVBoxLayout(central);
-    layout->setContentsMargins(16, 16, 16, 8);
-    layout->setSpacing(8);
+    QVBoxLayout *mainLayout = new QVBoxLayout(central);
+    mainLayout->setContentsMargins(16, 16, 16, 8);
+    mainLayout->setSpacing(8);
 
+    tabs = new QTabWidget();
+    tabs->setAccessibleName("Secciones del repositor");
+
+    QWidget *tabProd = new QWidget();
+    QVBoxLayout *layProd = new QVBoxLayout(tabProd);
+    layProd->setContentsMargins(0, 8, 0, 0);
+    setupProductsTab(layProd);
+    tabs->addTab(tabProd, "Productos");
+
+    QWidget *tabSup = new QWidget();
+    QVBoxLayout *laySup = new QVBoxLayout(tabSup);
+    laySup->setContentsMargins(0, 8, 0, 0);
+    setupSuppliersTab(laySup);
+    tabs->addTab(tabSup, "Proveedores");
+
+    mainLayout->addWidget(tabs);
+
+    QPushButton *btnLogout = new QPushButton("Cerrar sesi\u00f3n");
+    btnLogout->setObjectName("btnText");
+    btnLogout->setCursor(Qt::PointingHandCursor);
+    connect(btnLogout, &QPushButton::clicked, this, [this]() {
+        if (QMessageBox::question(this, "Cerrar sesi\u00f3n",
+                "\u00bfEst\u00e1 seguro de que desea cerrar sesi\u00f3n?",
+                QMessageBox::Yes | QMessageBox::No) == QMessageBox::Yes)
+            emit loggedOut();
+    });
+    mainLayout->addWidget(btnLogout, 0, Qt::AlignCenter);
+
+    setCentralWidget(central);
+
+    statusBar()->showMessage(
+        QString("Repositor: %1").arg(m_username));
+
+    connect(tabs, &QTabWidget::currentChanged, this, [this](int index) {
+        switch (index) {
+            case 0: loadProducts(); loadStockReport(); break;
+            case 1: loadSuppliers(); break;
+            default: break;
+        }
+    });
+
+    loadProducts();
+    loadStockReport();
+}
+
+void RepositorWindow::setupProductsTab(QVBoxLayout *layout) {
     QLabel *lblBienvenida =
-        new QLabel(QString("Repositor: %1").arg(username));
+        new QLabel(QString("Repositor: %1").arg(m_username));
     lblBienvenida->setStyleSheet("font-size: 18px; font-weight: 300; color: #1d1d1f;");
     layout->addWidget(lblBienvenida);
 
@@ -28,14 +76,14 @@ RepositorWindow::RepositorWindow(const QString &username, int userId,
     lblProd->setStyleSheet("font-size: 14px; font-weight: 500; margin-top: 8px; color: #1d1d1f;");
     layout->addWidget(lblProd);
 
-    tablaProductos = new QTableWidget(0, 5, this);
+    tablaProductos = new QTableWidget(0, 6, this);
     tablaProductos->setHorizontalHeaderLabels(
-        {"ID", "Nombre", "Precio", "Stock", "Stock Minimo"});
+        {"ID", "Nombre", "Precio", "Stock", "Stock Minimo", "Proveedor"});
     tablaProductos->setAccessibleName("Inventario de productos");
     tablaProductos->horizontalHeader()->setStretchLastSection(true);
     tablaProductos->setEditTriggers(QAbstractItemView::NoEditTriggers);
     tablaProductos->setSelectionBehavior(QAbstractItemView::SelectRows);
-    tablaProductos->setAlternatingRowColors(true);
+    tablaProductos->setAlternatingRowColors(false);
     layout->addWidget(tablaProductos);
 
     QHBoxLayout *btnRow = new QHBoxLayout();
@@ -43,7 +91,11 @@ RepositorWindow::RepositorWindow(const QString &username, int userId,
     btnActualizarStock->setObjectName("btnPrimary");
     btnActualizarStock->setCursor(Qt::PointingHandCursor);
     connect(btnActualizarStock, &QPushButton::clicked, this,
-            &RepositorWindow::updateStock);
+            [this, btnActualizarStock]() {
+        btnActualizarStock->setEnabled(false);
+        updateStock();
+        btnActualizarStock->setEnabled(true);
+    });
     btnRow->addWidget(btnActualizarStock);
 
     QPushButton *btnRefresh = new QPushButton("Actualizar Productos");
@@ -58,14 +110,14 @@ RepositorWindow::RepositorWindow(const QString &username, int userId,
     lblStock->setStyleSheet("font-size: 14px; font-weight: 500; margin-top: 12px; color: #1d1d1f;");
     layout->addWidget(lblStock);
 
-    tablaStockBajo = new QTableWidget(0, 5, this);
+    tablaStockBajo = new QTableWidget(0, 6, this);
     tablaStockBajo->setHorizontalHeaderLabels(
-        {"ID", "Nombre", "Stock Actual", "Stock Minimo", "Faltante"});
+        {"ID", "Nombre", "Stock Actual", "Stock Minimo", "Faltante", "Proveedor"});
     tablaStockBajo->setAccessibleName("Productos con stock bajo");
     tablaStockBajo->horizontalHeader()->setStretchLastSection(true);
     tablaStockBajo->setEditTriggers(QAbstractItemView::NoEditTriggers);
     tablaStockBajo->setSelectionBehavior(QAbstractItemView::SelectRows);
-    tablaStockBajo->setAlternatingRowColors(true);
+    tablaStockBajo->setAlternatingRowColors(false);
     layout->addWidget(tablaStockBajo);
 
     QHBoxLayout *bottomRow = new QHBoxLayout();
@@ -74,29 +126,52 @@ RepositorWindow::RepositorWindow(const QString &username, int userId,
     connect(btnRefreshStock, &QPushButton::clicked, this,
             &RepositorWindow::loadStockReport);
     bottomRow->addWidget(btnRefreshStock);
-
     bottomRow->addStretch();
-
-    QPushButton *btnLogout = new QPushButton("Cerrar sesi\u00f3n");
-    btnLogout->setObjectName("btnText");
-    btnLogout->setCursor(Qt::PointingHandCursor);
-    connect(btnLogout, &QPushButton::clicked, this, [this]() {
-        if (QMessageBox::question(this, "Cerrar sesi\u00f3n",
-                "\u00bfEst\u00e1 seguro de que desea cerrar sesi\u00f3n?",
-                QMessageBox::Yes | QMessageBox::No) == QMessageBox::Yes)
-            emit loggedOut();
-    });
-    bottomRow->addWidget(btnLogout);
-
     layout->addLayout(bottomRow);
-
-    setCentralWidget(central);
-
-    statusBar()->showMessage(
-        QString("Repositor: %1").arg(m_username));
 
     loadProducts();
     loadStockReport();
+}
+
+void RepositorWindow::setupSuppliersTab(QVBoxLayout *layout) {
+    tablaProveedores = new QTableWidget(0, 6, this);
+    tablaProveedores->setHorizontalHeaderLabels(
+        {"ID", "Nombre", "Contacto", "Telefono", "Email", "CUIT"});
+    tablaProveedores->setAccessibleName("Lista de proveedores");
+    tablaProveedores->horizontalHeader()->setStretchLastSection(true);
+    tablaProveedores->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    tablaProveedores->setSelectionBehavior(QAbstractItemView::SelectRows);
+    tablaProveedores->setAlternatingRowColors(false);
+    layout->addWidget(tablaProveedores);
+
+    QHBoxLayout *btnRow = new QHBoxLayout();
+    QPushButton *btnAdd = new QPushButton("Agregar Proveedor");
+    btnAdd->setObjectName("btnPrimary");
+    btnAdd->setCursor(Qt::PointingHandCursor);
+    QPushButton *btnEdit = new QPushButton("Editar Proveedor");
+    btnEdit->setCursor(Qt::PointingHandCursor);
+    QPushButton *btnDel = new QPushButton("Eliminar Proveedor");
+    btnDel->setObjectName("btnDanger");
+    btnDel->setCursor(Qt::PointingHandCursor);
+    btnDel->setToolTip("Elimina el proveedor seleccionado");
+    connect(btnAdd, &QPushButton::clicked, this,
+            [this, btnAdd]() {
+        btnAdd->setEnabled(false);
+        showAddSupplierDialog();
+        btnAdd->setEnabled(true);
+    });
+    connect(btnEdit, &QPushButton::clicked, this,
+            &RepositorWindow::showEditSupplierDialog);
+    connect(btnDel, &QPushButton::clicked, this, &RepositorWindow::deleteSupplier);
+    connect(tablaProveedores, &QTableWidget::cellDoubleClicked, this,
+            [this](int, int) { showEditSupplierDialog(); });
+    btnRow->addWidget(btnAdd);
+    btnRow->addWidget(btnEdit);
+    btnRow->addWidget(btnDel);
+    btnRow->addStretch();
+    layout->addLayout(btnRow);
+
+    loadSuppliers();
 }
 
 void RepositorWindow::loadProducts() {
@@ -116,6 +191,8 @@ void RepositorWindow::loadProducts() {
             row, 3, new QTableWidgetItem(QString::number(p.stock)));
         tablaProductos->setItem(
             row, 4, new QTableWidgetItem(QString::number(p.minStock)));
+        tablaProductos->setItem(
+            row, 5, new QTableWidgetItem(p.supplierName));
     }
 }
 
@@ -135,6 +212,24 @@ void RepositorWindow::loadStockReport() {
         tablaStockBajo->setItem(
             row, 4,
             new QTableWidgetItem(QString::number(p.minStock - p.stock)));
+        tablaStockBajo->setItem(
+            row, 5, new QTableWidgetItem(p.supplierName));
+    }
+}
+
+void RepositorWindow::loadSuppliers() {
+    tablaProveedores->setRowCount(0);
+    auto suppliers = m_suppliers->allSuppliers();
+    for (const auto &s : suppliers) {
+        int row = tablaProveedores->rowCount();
+        tablaProveedores->insertRow(row);
+        tablaProveedores->setItem(
+            row, 0, new QTableWidgetItem(QString::number(s.id)));
+        tablaProveedores->setItem(row, 1, new QTableWidgetItem(s.name));
+        tablaProveedores->setItem(row, 2, new QTableWidgetItem(s.contact));
+        tablaProveedores->setItem(row, 3, new QTableWidgetItem(s.phone));
+        tablaProveedores->setItem(row, 4, new QTableWidgetItem(s.email));
+        tablaProveedores->setItem(row, 5, new QTableWidgetItem(s.cuit));
     }
 }
 
@@ -145,9 +240,16 @@ void RepositorWindow::updateStock() {
         return;
     }
 
-    int id = tablaProductos->item(row, 0)->text().toInt();
-    QString name = tablaProductos->item(row, 1)->text();
-    int currentStock = tablaProductos->item(row, 3)->text().toInt();
+    auto *idItem = tablaProductos->item(row, 0);
+    auto *nameItem = tablaProductos->item(row, 1);
+    auto *stockItem = tablaProductos->item(row, 3);
+    if (!idItem || !nameItem || !stockItem) {
+        QMessageBox::warning(this, "Error", "Error al leer datos del producto");
+        return;
+    }
+    int id = idItem->text().toInt();
+    QString name = nameItem->text();
+    int currentStock = stockItem->text().toInt();
 
     bool ok;
     int newStock = QInputDialog::getInt(this, "Actualizar Stock",
@@ -172,5 +274,79 @@ void RepositorWindow::updateStock() {
                                     .arg(name).arg(newStock));
     } else {
         QMessageBox::warning(this, "Error", updateResult.errorMessage);
+    }
+}
+
+void RepositorWindow::showAddSupplierDialog() {
+    SupplierDialog dialog(this);
+    if (dialog.exec() != QDialog::Accepted)
+        return;
+
+    Supplier s = dialog.supplier();
+    auto result = m_suppliers->addSupplier(s.name, s.contact, s.phone,
+                                           s.email, s.address, s.cuit);
+    if (result.success)
+        loadSuppliers();
+    else
+        QMessageBox::critical(this, "Error", result.errorMessage);
+}
+
+void RepositorWindow::showEditSupplierDialog() {
+    int row = tablaProveedores->currentRow();
+    if (row < 0) {
+        QMessageBox::warning(this, "Error", "Seleccione un proveedor");
+        return;
+    }
+
+    auto *idItem = tablaProveedores->item(row, 0);
+    if (!idItem) {
+        QMessageBox::warning(this, "Error", "Error al leer datos del proveedor");
+        return;
+    }
+    int id = idItem->text().toInt();
+    auto result = m_suppliers->findSupplier(id);
+    if (!result.success) {
+        QMessageBox::warning(this, "Error", result.message);
+        return;
+    }
+
+    SupplierDialog dialog(result.value, this);
+    if (dialog.exec() != QDialog::Accepted)
+        return;
+
+    Supplier s = dialog.supplier();
+    s.id = id;
+    auto updResult = m_suppliers->updateSupplier(s);
+    if (updResult.success)
+        loadSuppliers();
+    else
+        QMessageBox::critical(this, "Error", updResult.errorMessage);
+}
+
+void RepositorWindow::deleteSupplier() {
+    int row = tablaProveedores->currentRow();
+    if (row < 0) {
+        QMessageBox::warning(this, "Error", "Seleccione un proveedor");
+        return;
+    }
+
+    auto *idItem = tablaProveedores->item(row, 0);
+    auto *nameItem = tablaProveedores->item(row, 1);
+    if (!idItem || !nameItem) {
+        QMessageBox::warning(this, "Error", "Error al leer datos del proveedor");
+        return;
+    }
+    int id = idItem->text().toInt();
+    QString name = nameItem->text();
+
+    if (QMessageBox::question(this, "Confirmar",
+                              "Eliminar proveedor '" + name + "'?",
+                              QMessageBox::Yes | QMessageBox::No) ==
+        QMessageBox::Yes) {
+        auto result = m_suppliers->removeSupplier(id);
+        if (result.success)
+            loadSuppliers();
+        else
+            QMessageBox::warning(this, "Error", result.errorMessage);
     }
 }

@@ -12,6 +12,7 @@
 #include "controllers/InventoryController.h"
 #include "controllers/BillingController.h"
 #include "controllers/ClientController.h"
+#include "controllers/SupplierController.h"
 #include <memory>
 
 class AdminWindow : public QMainWindow {
@@ -32,6 +33,7 @@ private:
     std::unique_ptr<InventoryController> m_inventory;
     std::unique_ptr<BillingController> m_billing;
     std::unique_ptr<ClientController> m_clients;
+    std::unique_ptr<SupplierController> m_suppliers;
 
     QTabWidget *tabs;
     QTableWidget *tablaFacturas;
@@ -39,15 +41,18 @@ private:
     QTableWidget *tablaUsuarios;
     QTableWidget *tablaProductos;
     QTableWidget *tablaStockReport;
+    QTableWidget *tablaProveedores;
 
     void setupInvoicesTab(QVBoxLayout *layout);
     void setupClientsTab(QVBoxLayout *layout);
+    void setupSuppliersTab(QVBoxLayout *layout);
     void setupUsersTab(QVBoxLayout *layout);
     void setupProductsTab(QVBoxLayout *layout);
     void setupStockReportTab(QVBoxLayout *layout);
 
     void loadInvoices();
     void loadClients();
+    void loadSuppliers();
     void loadUsers();
     void loadProducts();
     void loadStockReport();
@@ -59,4 +64,7 @@ private:
     void showAddClientDialog();
     void showEditClientDialog();
     void deleteClient();
+    void showAddSupplierDialog();
+    void showEditSupplierDialog();
+    void deleteSupplier();
 };

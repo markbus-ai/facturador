@@ -1,6 +1,10 @@
 #include "adminwindow.h"
 #include "invoicedialog.h"
+#include "productdialog.h"
+#include "clientdialog.h"
+#include "supplierdialog.h"
 #include "controllers/AuthController.h"
+#include "controllers/SupplierController.h"
 #include <QHeaderView>
 #include <QInputDialog>
 #include <QMessageBox>
@@ -17,6 +21,7 @@ AdminWindow::AdminWindow(const QString &username, int userId,
     m_inventory = std::make_unique<InventoryController>(*m_access);
     m_billing = std::make_unique<BillingController>(*m_access, m_userId);
     m_clients = std::make_unique<ClientController>(*m_access);
+    m_suppliers = std::make_unique<SupplierController>(*m_access);
 
     QWidget *central = new QWidget(this);
     QVBoxLayout *mainLayout = new QVBoxLayout(central);
@@ -44,6 +49,12 @@ AdminWindow::AdminWindow(const QString &username, int userId,
     setupClientsTab(layCli);
     tabs->addTab(tabCli, "Clientes");
 
+    QWidget *tabSup = new QWidget();
+    QVBoxLayout *laySup = new QVBoxLayout(tabSup);
+    laySup->setContentsMargins(0, 8, 0, 0);
+    setupSuppliersTab(laySup);
+    tabs->addTab(tabSup, "Proveedores");
+
     QWidget *tabUsr = new QWidget();
     QVBoxLayout *layUsr = new QVBoxLayout(tabUsr);
     layUsr->setContentsMargins(0, 8, 0, 0);
@@ -63,8 +74,10 @@ AdminWindow::AdminWindow(const QString &username, int userId,
             case 0: loadInvoices(); break;
             case 1: loadProducts(); break;
             case 2: loadClients(); break;
-            case 3: loadUsers(); break;
-            case 4: loadStockReport(); break;
+            case 3: loadSuppliers(); break;
+            case 4: loadUsers(); break;
+            case 5: loadStockReport(); break;
+            default: break;
         }
     });
 
@@ -96,7 +109,11 @@ void AdminWindow::setupInvoicesTab(QVBoxLayout *layout) {
     btnNueva->setObjectName("btnPrimary");
     btnNueva->setCursor(Qt::PointingHandCursor);
     connect(btnNueva, &QPushButton::clicked, this,
-            &AdminWindow::showNewInvoiceDialog);
+            [this, btnNueva]() {
+        btnNueva->setEnabled(false);
+        showNewInvoiceDialog();
+        btnNueva->setEnabled(true);
+    });
     btnRow->addWidget(btnNueva);
     btnRow->addStretch();
     layout->addLayout(btnRow);
@@ -108,34 +125,34 @@ void AdminWindow::setupInvoicesTab(QVBoxLayout *layout) {
     tablaFacturas->horizontalHeader()->setStretchLastSection(true);
     tablaFacturas->setEditTriggers(QAbstractItemView::NoEditTriggers);
     tablaFacturas->setSelectionBehavior(QAbstractItemView::SelectRows);
-    tablaFacturas->setAlternatingRowColors(true);
+    tablaFacturas->setAlternatingRowColors(false);
     layout->addWidget(tablaFacturas);
 
-    QPushButton *btnEliminar = new QPushButton("Eliminar factura seleccionada");
-    btnEliminar->setObjectName("btnDanger");
-    btnEliminar->setCursor(Qt::PointingHandCursor);
-    btnEliminar->setToolTip("Elimina la factura seleccionada de la lista");
-    connect(btnEliminar, &QPushButton::clicked, this, [this]() {
-        int row = tablaFacturas->currentRow();
-        if (row < 0) {
-            QMessageBox::warning(this, "Error", "Seleccione una factura");
-            return;
-        }
-        int id = tablaFacturas->item(row, 0)->text().toInt();
-        QString clientName = tablaFacturas->item(row, 1)->text();
-        QString total = tablaFacturas->item(row, 4)->text();
-        if (QMessageBox::question(this, "Confirmar",
-                                  QString("Eliminar factura #%1?\nCliente: %2\nTotal: %3")
-                                      .arg(id).arg(clientName).arg(total),
-                                  QMessageBox::Yes | QMessageBox::No) == QMessageBox::Yes) {
-            auto result = m_billing->deleteInvoice(id);
-            if (result.success)
-                loadInvoices();
-            else
-                QMessageBox::warning(this, "Error", result.errorMessage);
-        }
-    });
-    layout->addWidget(btnEliminar);
+    // QPushButton *btnEliminar = new QPushButton("Eliminar factura seleccionada");
+    // btnEliminar->setObjectName("btnDanger");
+    // btnEliminar->setCursor(Qt::PointingHandCursor);
+    // btnEliminar->setToolTip("Elimina la factura seleccionada de la lista");
+    // connect(btnEliminar, &QPushButton::clicked, this, [this]() {
+    //     int row = tablaFacturas->currentRow();
+    //     if (row < 0) {
+    //         QMessageBox::warning(this, "Error", "Seleccione una factura");
+    //         return;
+    //     }
+    //     int id = tablaFacturas->item(row, 0)->text().toInt();
+    //     QString clientName = tablaFacturas->item(row, 1)->text();
+    //     QString total = tablaFacturas->item(row, 4)->text();
+    //     if (QMessageBox::question(this, "Confirmar",
+    //                               QString("Eliminar factura #%1?\nCliente: %2\nTotal: %3")
+    //                                   .arg(id).arg(clientName).arg(total),
+    //                               QMessageBox::Yes | QMessageBox::No) == QMessageBox::Yes) {
+    //         auto result = m_billing->deleteInvoice(id);
+    //         if (result.success)
+    //             loadInvoices();
+    //         else
+    //             QMessageBox::warning(this, "Error", result.errorMessage);
+    //     }
+    // });
+    // layout->addWidget(btnEliminar);
 
     loadInvoices();
 }
@@ -148,7 +165,7 @@ void AdminWindow::setupClientsTab(QVBoxLayout *layout) {
     tablaClientes->horizontalHeader()->setStretchLastSection(true);
     tablaClientes->setEditTriggers(QAbstractItemView::NoEditTriggers);
     tablaClientes->setSelectionBehavior(QAbstractItemView::SelectRows);
-    tablaClientes->setAlternatingRowColors(true);
+    tablaClientes->setAlternatingRowColors(false);
     layout->addWidget(tablaClientes);
 
     QHBoxLayout *btnRow = new QHBoxLayout();
@@ -162,7 +179,11 @@ void AdminWindow::setupClientsTab(QVBoxLayout *layout) {
     btnDel->setCursor(Qt::PointingHandCursor);
     btnDel->setToolTip("Elimina el cliente seleccionado");
     connect(btnAdd, &QPushButton::clicked, this,
-            &AdminWindow::showAddClientDialog);
+            [this, btnAdd]() {
+        btnAdd->setEnabled(false);
+        showAddClientDialog();
+        btnAdd->setEnabled(true);
+    });
     connect(btnEdit, &QPushButton::clicked, this,
             &AdminWindow::showEditClientDialog);
     connect(btnDel, &QPushButton::clicked, this, &AdminWindow::deleteClient);
@@ -177,6 +198,47 @@ void AdminWindow::setupClientsTab(QVBoxLayout *layout) {
     loadClients();
 }
 
+void AdminWindow::setupSuppliersTab(QVBoxLayout *layout) {
+    tablaProveedores = new QTableWidget(0, 6, this);
+    tablaProveedores->setHorizontalHeaderLabels(
+        {"ID", "Nombre", "Contacto", "Telefono", "Email", "CUIT"});
+    tablaProveedores->setAccessibleName("Lista de proveedores");
+    tablaProveedores->horizontalHeader()->setStretchLastSection(true);
+    tablaProveedores->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    tablaProveedores->setSelectionBehavior(QAbstractItemView::SelectRows);
+    tablaProveedores->setAlternatingRowColors(false);
+    layout->addWidget(tablaProveedores);
+
+    QHBoxLayout *btnRow = new QHBoxLayout();
+    QPushButton *btnAdd = new QPushButton("Agregar Proveedor");
+    btnAdd->setObjectName("btnPrimary");
+    btnAdd->setCursor(Qt::PointingHandCursor);
+    QPushButton *btnEdit = new QPushButton("Editar Proveedor");
+    btnEdit->setCursor(Qt::PointingHandCursor);
+    QPushButton *btnDel = new QPushButton("Eliminar Proveedor");
+    btnDel->setObjectName("btnDanger");
+    btnDel->setCursor(Qt::PointingHandCursor);
+    btnDel->setToolTip("Elimina el proveedor seleccionado");
+    connect(btnAdd, &QPushButton::clicked, this,
+            [this, btnAdd]() {
+        btnAdd->setEnabled(false);
+        showAddSupplierDialog();
+        btnAdd->setEnabled(true);
+    });
+    connect(btnEdit, &QPushButton::clicked, this,
+            &AdminWindow::showEditSupplierDialog);
+    connect(btnDel, &QPushButton::clicked, this, &AdminWindow::deleteSupplier);
+    connect(tablaProveedores, &QTableWidget::cellDoubleClicked, this,
+            [this](int, int) { showEditSupplierDialog(); });
+    btnRow->addWidget(btnAdd);
+    btnRow->addWidget(btnEdit);
+    btnRow->addWidget(btnDel);
+    btnRow->addStretch();
+    layout->addLayout(btnRow);
+
+    loadSuppliers();
+}
+
 void AdminWindow::setupUsersTab(QVBoxLayout *layout) {
     tablaUsuarios = new QTableWidget(0, 3, this);
     tablaUsuarios->setHorizontalHeaderLabels({"ID", "Usuario", "Rol"});
@@ -184,7 +246,7 @@ void AdminWindow::setupUsersTab(QVBoxLayout *layout) {
     tablaUsuarios->horizontalHeader()->setStretchLastSection(true);
     tablaUsuarios->setEditTriggers(QAbstractItemView::NoEditTriggers);
     tablaUsuarios->setSelectionBehavior(QAbstractItemView::SelectRows);
-    tablaUsuarios->setAlternatingRowColors(true);
+    tablaUsuarios->setAlternatingRowColors(false);
     layout->addWidget(tablaUsuarios);
 
     QHBoxLayout *rolRow = new QHBoxLayout();
@@ -198,8 +260,21 @@ void AdminWindow::setupUsersTab(QVBoxLayout *layout) {
             QMessageBox::warning(this, "Error", "Seleccione un usuario");
             return;
         }
-        int id = tablaUsuarios->item(row, 0)->text().toInt();
-        QString userName = tablaUsuarios->item(row, 1)->text();
+        auto *idItem = tablaUsuarios->item(row, 0);
+        auto *nameItem = tablaUsuarios->item(row, 1);
+        if (!idItem || !nameItem) {
+            QMessageBox::warning(this, "Error", "Error al leer datos del usuario");
+            return;
+        }
+        int id = idItem->text().toInt();
+        QString userName = nameItem->text();
+
+        auto *roleItem = tablaUsuarios->item(row, 2);
+        if (roleItem) {
+            int rIdx = cmbNuevoRol->findText(roleItem->text());
+            if (rIdx >= 0) cmbNuevoRol->setCurrentIndex(rIdx);
+        }
+
         QString newRole = cmbNuevoRol->currentText();
 
         if (id == m_userId) {
@@ -271,8 +346,14 @@ void AdminWindow::setupUsersTab(QVBoxLayout *layout) {
             QMessageBox::warning(this, "Error", "Seleccione un usuario");
             return;
         }
-        int id = tablaUsuarios->item(row, 0)->text().toInt();
-        QString userName = tablaUsuarios->item(row, 1)->text();
+        auto *idItem = tablaUsuarios->item(row, 0);
+        auto *nameItem = tablaUsuarios->item(row, 1);
+        if (!idItem || !nameItem) {
+            QMessageBox::warning(this, "Error", "Error al leer datos del usuario");
+            return;
+        }
+        int id = idItem->text().toInt();
+        QString userName = nameItem->text();
 
         if (id == m_userId) {
             QMessageBox::warning(this, "Operacion no permitida",
@@ -301,14 +382,14 @@ void AdminWindow::setupUsersTab(QVBoxLayout *layout) {
 }
 
 void AdminWindow::setupProductsTab(QVBoxLayout *layout) {
-    tablaProductos = new QTableWidget(0, 6, this);
+    tablaProductos = new QTableWidget(0, 7, this);
     tablaProductos->setHorizontalHeaderLabels(
-        {"ID", "Nombre", "Descripcion", "Precio", "Stock", "Stock Minimo"});
+        {"ID", "Nombre", "Descripcion", "Precio", "Stock", "Stock Minimo", "Proveedor"});
     tablaProductos->setAccessibleName("Lista de productos");
     tablaProductos->horizontalHeader()->setStretchLastSection(true);
     tablaProductos->setEditTriggers(QAbstractItemView::NoEditTriggers);
     tablaProductos->setSelectionBehavior(QAbstractItemView::SelectRows);
-    tablaProductos->setAlternatingRowColors(true);
+    tablaProductos->setAlternatingRowColors(false);
     layout->addWidget(tablaProductos);
 
     QHBoxLayout *btnRow = new QHBoxLayout();
@@ -322,7 +403,11 @@ void AdminWindow::setupProductsTab(QVBoxLayout *layout) {
     btnDel->setCursor(Qt::PointingHandCursor);
     btnDel->setToolTip("Elimina el producto seleccionado");
     connect(btnAdd, &QPushButton::clicked, this,
-            &AdminWindow::showAddProductDialog);
+            [this, btnAdd]() {
+        btnAdd->setEnabled(false);
+        showAddProductDialog();
+        btnAdd->setEnabled(true);
+    });
     connect(btnEdit, &QPushButton::clicked, this,
             &AdminWindow::showEditProductDialog);
     connect(btnDel, &QPushButton::clicked, this, &AdminWindow::deleteProduct);
@@ -349,7 +434,7 @@ void AdminWindow::setupStockReportTab(QVBoxLayout *layout) {
     tablaStockReport->horizontalHeader()->setStretchLastSection(true);
     tablaStockReport->setEditTriggers(QAbstractItemView::NoEditTriggers);
     tablaStockReport->setSelectionBehavior(QAbstractItemView::SelectRows);
-    tablaStockReport->setAlternatingRowColors(true);
+    tablaStockReport->setAlternatingRowColors(false);
     layout->addWidget(tablaStockReport);
 
     QPushButton *btnRefresh = new QPushButton("Actualizar Reporte");
@@ -430,6 +515,8 @@ void AdminWindow::loadProducts() {
             row, 4, new QTableWidgetItem(QString::number(p.stock)));
         tablaProductos->setItem(
             row, 5, new QTableWidgetItem(QString::number(p.minStock)));
+        tablaProductos->setItem(
+            row, 6, new QTableWidgetItem(p.supplierName));
     }
 }
 
@@ -452,6 +539,96 @@ void AdminWindow::loadStockReport() {
     }
 }
 
+void AdminWindow::loadSuppliers() {
+    tablaProveedores->setRowCount(0);
+    auto suppliers = m_suppliers->allSuppliers();
+    for (const auto &s : suppliers) {
+        int row = tablaProveedores->rowCount();
+        tablaProveedores->insertRow(row);
+        tablaProveedores->setItem(
+            row, 0, new QTableWidgetItem(QString::number(s.id)));
+        tablaProveedores->setItem(row, 1, new QTableWidgetItem(s.name));
+        tablaProveedores->setItem(row, 2, new QTableWidgetItem(s.contact));
+        tablaProveedores->setItem(row, 3, new QTableWidgetItem(s.phone));
+        tablaProveedores->setItem(row, 4, new QTableWidgetItem(s.email));
+        tablaProveedores->setItem(row, 5, new QTableWidgetItem(s.cuit));
+    }
+}
+
+void AdminWindow::showAddSupplierDialog() {
+    SupplierDialog dialog(this);
+    if (dialog.exec() != QDialog::Accepted)
+        return;
+
+    Supplier s = dialog.supplier();
+    auto result = m_suppliers->addSupplier(s.name, s.contact, s.phone,
+                                           s.email, s.address, s.cuit);
+    if (result.success)
+        loadSuppliers();
+    else
+        QMessageBox::critical(this, "Error", result.errorMessage);
+}
+
+void AdminWindow::showEditSupplierDialog() {
+    int row = tablaProveedores->currentRow();
+    if (row < 0) {
+        QMessageBox::warning(this, "Error", "Seleccione un proveedor");
+        return;
+    }
+
+    auto *idItem = tablaProveedores->item(row, 0);
+    if (!idItem) {
+        QMessageBox::warning(this, "Error", "Error al leer datos del proveedor");
+        return;
+    }
+    int id = idItem->text().toInt();
+    auto result = m_suppliers->findSupplier(id);
+    if (!result.success) {
+        QMessageBox::warning(this, "Error", result.message);
+        return;
+    }
+
+    SupplierDialog dialog(result.value, this);
+    if (dialog.exec() != QDialog::Accepted)
+        return;
+
+    Supplier s = dialog.supplier();
+    s.id = id;
+    auto updResult = m_suppliers->updateSupplier(s);
+    if (updResult.success)
+        loadSuppliers();
+    else
+        QMessageBox::critical(this, "Error", updResult.errorMessage);
+}
+
+void AdminWindow::deleteSupplier() {
+    int row = tablaProveedores->currentRow();
+    if (row < 0) {
+        QMessageBox::warning(this, "Error", "Seleccione un proveedor");
+        return;
+    }
+
+    auto *idItem = tablaProveedores->item(row, 0);
+    auto *nameItem = tablaProveedores->item(row, 1);
+    if (!idItem || !nameItem) {
+        QMessageBox::warning(this, "Error", "Error al leer datos del proveedor");
+        return;
+    }
+    int id = idItem->text().toInt();
+    QString name = nameItem->text();
+
+    if (QMessageBox::question(this, "Confirmar",
+                              "Eliminar proveedor '" + name + "'?",
+                              QMessageBox::Yes | QMessageBox::No) ==
+        QMessageBox::Yes) {
+        auto result = m_suppliers->removeSupplier(id);
+        if (result.success)
+            loadSuppliers();
+        else
+            QMessageBox::warning(this, "Error", result.errorMessage);
+    }
+}
+
 void AdminWindow::showNewInvoiceDialog() {
     InvoiceDialog dialog(*m_billing, m_userId, this);
     if (dialog.exec() == QDialog::Accepted) {
@@ -461,34 +638,13 @@ void AdminWindow::showNewInvoiceDialog() {
 }
 
 void AdminWindow::showAddProductDialog() {
-    bool ok;
-    QString name = QInputDialog::getText(this, "Nuevo Producto", "Nombre:",
-                                         QLineEdit::Normal, "", &ok);
-    if (!ok || name.trimmed().isEmpty())
+    ProductDialog dialog(*m_suppliers, this);
+    if (dialog.exec() != QDialog::Accepted)
         return;
 
-    QString desc = QInputDialog::getText(this, "Nuevo Producto", "Descripcion:",
-                                         QLineEdit::Normal, "", &ok);
-    if (!ok)
-        return;
-
-    double price = QInputDialog::getDouble(this, "Nuevo Producto", "Precio:",
-                                           0, 0, 999999, 2, &ok);
-    if (!ok)
-        return;
-
-    int stock = QInputDialog::getInt(this, "Nuevo Producto", "Stock:", 0, 0,
-                                     999999, 1, &ok);
-    if (!ok)
-        return;
-
-    int minStock = QInputDialog::getInt(this, "Nuevo Producto",
-                                        "Stock Minimo:", 0, 0, 999999, 1, &ok);
-    if (!ok)
-        return;
-
-    auto result =
-        m_inventory->addProduct(name, desc, price, stock, minStock);
+    Product p = dialog.product();
+    auto result = m_inventory->addProduct(p.name, p.description, p.price,
+                                          p.stock, p.minStock, p.supplierId);
     if (result.success)
         loadProducts();
     else
@@ -502,49 +658,23 @@ void AdminWindow::showEditProductDialog() {
         return;
     }
 
-    auto prodResult = m_inventory->findProduct(
-        tablaProductos->item(row, 0)->text().toInt());
+    auto *idItem = tablaProductos->item(row, 0);
+    if (!idItem) {
+        QMessageBox::warning(this, "Error", "Error al leer datos del producto");
+        return;
+    }
+    auto prodResult = m_inventory->findProduct(idItem->text().toInt());
     if (!prodResult.success) {
         QMessageBox::warning(this, "Error", prodResult.message);
         return;
     }
 
-    Product p = prodResult.value;
-    bool ok;
-
-    QString name = QInputDialog::getText(this, "Editar Producto", "Nombre:",
-                                         QLineEdit::Normal, p.name, &ok);
-    if (!ok || name.trimmed().isEmpty())
+    ProductDialog dialog(prodResult.value, *m_suppliers, this);
+    if (dialog.exec() != QDialog::Accepted)
         return;
 
-    QString desc = QInputDialog::getText(this, "Editar Producto",
-                                         "Descripcion:", QLineEdit::Normal,
-                                         p.description, &ok);
-    if (!ok)
-        return;
-
-    double price = QInputDialog::getDouble(this, "Editar Producto", "Precio:",
-                                           p.price, 0, 999999, 2, &ok);
-    if (!ok)
-        return;
-
-    int stock = QInputDialog::getInt(this, "Editar Producto", "Stock:",
-                                     p.stock, 0, 999999, 1, &ok);
-    if (!ok)
-        return;
-
-    int minStock = QInputDialog::getInt(this, "Editar Producto",
-                                        "Stock Minimo:", p.minStock, 0, 999999,
-                                        1, &ok);
-    if (!ok)
-        return;
-
-    p.name = name.trimmed();
-    p.description = desc.trimmed();
-    p.price = price;
-    p.stock = stock;
-    p.minStock = minStock;
-
+    Product p = dialog.product();
+    p.id = prodResult.value.id;
     auto result = m_inventory->updateProduct(p);
     if (result.success)
         loadProducts();
@@ -559,8 +689,14 @@ void AdminWindow::deleteProduct() {
         return;
     }
 
-    int id = tablaProductos->item(row, 0)->text().toInt();
-    QString name = tablaProductos->item(row, 1)->text();
+    auto *idItem = tablaProductos->item(row, 0);
+    auto *nameItem = tablaProductos->item(row, 1);
+    if (!idItem || !nameItem) {
+        QMessageBox::warning(this, "Error", "Error al leer datos del producto");
+        return;
+    }
+    int id = idItem->text().toInt();
+    QString name = nameItem->text();
 
     if (QMessageBox::question(this, "Confirmar",
                               "Eliminar producto '" + name + "'?",
@@ -575,24 +711,12 @@ void AdminWindow::deleteProduct() {
 }
 
 void AdminWindow::showAddClientDialog() {
-    bool ok;
-    QString name = QInputDialog::getText(this, "Nuevo Cliente", "Nombre:",
-                                         QLineEdit::Normal, "", &ok);
-    if (!ok || name.trimmed().isEmpty())
+    ClientDialog dialog(this);
+    if (dialog.exec() != QDialog::Accepted)
         return;
 
-    QString address = QInputDialog::getText(this, "Nuevo Cliente",
-                                            "Direccion:", QLineEdit::Normal,
-                                            "", &ok);
-    if (!ok)
-        return;
-
-    QString phone = QInputDialog::getText(this, "Nuevo Cliente", "Telefono:",
-                                          QLineEdit::Normal, "", &ok);
-    if (!ok)
-        return;
-
-    auto result = m_clients->addClient(name, address, phone);
+    Client c = dialog.client();
+    auto result = m_clients->addClient(c.name, c.address, c.phone);
     if (result.success)
         loadClients();
     else
@@ -606,35 +730,24 @@ void AdminWindow::showEditClientDialog() {
         return;
     }
 
-    int id = tablaClientes->item(row, 0)->text().toInt();
+    auto *idItem = tablaClientes->item(row, 0);
+    if (!idItem) {
+        QMessageBox::warning(this, "Error", "Error al leer datos del cliente");
+        return;
+    }
+    int id = idItem->text().toInt();
     auto result = m_clients->findClient(id);
     if (!result.success) {
         QMessageBox::warning(this, "Error", result.message);
         return;
     }
 
-    Client c = result.value;
-    bool ok;
-
-    QString name = QInputDialog::getText(this, "Editar Cliente", "Nombre:",
-                                         QLineEdit::Normal, c.name, &ok);
-    if (!ok || name.trimmed().isEmpty())
+    ClientDialog dialog(result.value, this);
+    if (dialog.exec() != QDialog::Accepted)
         return;
 
-    QString address = QInputDialog::getText(this, "Editar Cliente",
-                                            "Direccion:", QLineEdit::Normal,
-                                            c.address, &ok);
-    if (!ok)
-        return;
-
-    QString phone = QInputDialog::getText(this, "Editar Cliente", "Telefono:",
-                                          QLineEdit::Normal, c.phone, &ok);
-    if (!ok)
-        return;
-
-    c.name = name.trimmed();
-    c.address = address.trimmed();
-    c.phone = phone.trimmed();
+    Client c = dialog.client();
+    c.id = id;
     auto updResult = m_clients->updateClient(c);
     if (updResult.success)
         loadClients();
@@ -649,8 +762,14 @@ void AdminWindow::deleteClient() {
         return;
     }
 
-    int id = tablaClientes->item(row, 0)->text().toInt();
-    QString name = tablaClientes->item(row, 1)->text();
+    auto *idItem = tablaClientes->item(row, 0);
+    auto *nameItem = tablaClientes->item(row, 1);
+    if (!idItem || !nameItem) {
+        QMessageBox::warning(this, "Error", "Error al leer datos del cliente");
+        return;
+    }
+    int id = idItem->text().toInt();
+    QString name = nameItem->text();
 
     if (QMessageBox::question(this, "Confirmar",
                               "Eliminar cliente '" + name + "'?",

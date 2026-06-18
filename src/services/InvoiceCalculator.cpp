@@ -1,4 +1,5 @@
 #include "InvoiceCalculator.h"
+#include "core/Validation.h"
 
 InvoiceTotals InvoiceCalculator::calculate(double subtotal,
                                            const IDiscountStrategy &discount) {
@@ -19,6 +20,7 @@ InvoiceTotals InvoiceCalculator::calculateBoth(
   double sumAfterPerItem = 0.0;
 
   for (const auto &item : items) {
+    if (item.subtotal < 0 || item.quantity <= 0) continue;
     totals.subtotal += item.subtotal;
     double disc = item.itemDiscountAmount();
     totals.discountAmount += disc;

@@ -96,9 +96,17 @@ RegisterWindow::RegisterWindow(QWidget *parent) : QDialog(parent) {
     layout->addStretch();
 
     connect(registerButton, &QPushButton::clicked, this, [this]() {
+        if (passwordEdit->text() != confirmPasswordEdit->text()) {
+            passwordEdit->setStyleSheet("border: 1px solid #d92b20;");
+            confirmPasswordEdit->setStyleSheet("border: 1px solid #d92b20;");
+            QMessageBox::warning(this, "Error", "Las contrase\u00f1as no coinciden");
+            return;
+        }
+        passwordEdit->setStyleSheet("");
+        confirmPasswordEdit->setStyleSheet("");
         AuthController auth;
         auto result = auth.registerUser(
-            usernameEdit->text(), passwordEdit->text(),
+            usernameEdit->text().trimmed(), passwordEdit->text(),
             confirmPasswordEdit->text());
         if (result.success) {
             m_registeredUsername = usernameEdit->text();

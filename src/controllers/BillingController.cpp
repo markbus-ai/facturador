@@ -8,10 +8,14 @@ BillingController::BillingController(const IAccessContract &access, int userId)
     : m_access(access), m_userId(userId), m_invoiceService(access) {}
 
 QList<Client> BillingController::allClients() {
+    if (!m_access.canManageClients() && !m_access.canCreateInvoice())
+        return {};
     return ClientRepository::instance().all();
 }
 
 QList<Product> BillingController::allProducts() {
+    if (!m_access.canQueryProducts())
+        return {};
     return ProductRepository::instance().all();
 }
 
@@ -41,6 +45,8 @@ Result BillingController::submitInvoice(int clientId, int userId,
 
 Result BillingController::deleteInvoice(int invoiceId) {
     if (!m_access.canViewAllInvoices())
+        return Result::fail("No tiene permisos para ver todas las facturas");
+    if (!m_access.canManageUsers())
         return Result::fail("No tiene permisos para eliminar facturas");
 
     if (!Validation::isIdValid(invoiceId))

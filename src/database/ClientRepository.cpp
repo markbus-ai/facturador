@@ -64,6 +64,8 @@ Result ClientRepository::update(const Client &client) {
         qDebug() << "Error actualizando cliente:" << q.lastError().text();
         return Result::fail("Error al actualizar cliente");
     }
+    if (q.numRowsAffected() == 0)
+        return Result::fail("Cliente no encontrado");
     return Result::ok();
 }
 
@@ -80,5 +82,7 @@ Result ClientRepository::remove(int id) {
         qDebug() << "Error eliminando cliente:" << q.lastError().text();
         return Result::fail("Error al eliminar cliente");
     }
+    if (q.numRowsAffected() == 0)
+        return Result::fail("Cliente no encontrado");
     return Result::ok();
 }

@@ -97,7 +97,7 @@ LoginWindow::LoginWindow(QWidget *parent) : QDialog(parent) {
     connect(passwordEdit, &QLineEdit::returnPressed, loginButton, &QPushButton::click);
     connect(loginButton, &QPushButton::clicked, this, [this]() {
         AuthController auth;
-        auto result = auth.login(usernameEdit->text(), passwordEdit->text());
+        auto result = auth.login(usernameEdit->text().trimmed(), passwordEdit->text());
         if (result.success) {
             m_username = result.value.username;
             m_role = result.value.role;

@@ -8,6 +8,7 @@
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QGroupBox>
+#include <QIntValidator>
 #include "controllers/BillingController.h"
 
 #include "core/IDiscountStrategy.h"
@@ -41,6 +42,7 @@ private:
     QDoubleSpinBox *spnItemValorDesc;
 
     QMetaObject::Connection m_cellChangedConn;
+    QIntValidator *m_qtyValidator = nullptr;
 
     void addItemRow();
     void removeItemRow();

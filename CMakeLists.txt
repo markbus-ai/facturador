@@ -18,15 +18,20 @@ add_executable(facturador
     src/database/ProductRepository.cpp
     src/database/ClientRepository.cpp
     src/database/InvoiceRepository.cpp
+    src/database/SupplierRepository.cpp
     src/controllers/AuthController.cpp
     src/controllers/InventoryController.cpp
     src/controllers/BillingController.cpp
     src/controllers/ClientController.cpp
+    src/controllers/SupplierController.cpp
     src/ui/login.cpp
     src/ui/registerwindows.cpp
     src/ui/adminwindow.cpp
     src/ui/userwindow.cpp
     src/ui/invoicedialog.cpp
+    src/ui/productdialog.cpp
+    src/ui/clientdialog.cpp
+    src/ui/supplierdialog.cpp
     src/ui/repositorwindow.cpp
 )
 
