@@ -3,6 +3,7 @@
 #include <QMessageBox>
 #include <QHeaderView>
 #include <QFrame>
+#include <QKeyEvent>
 #include <QMetaObject>
 #include <QIntValidator>
 #include <QtGlobal>
@@ -287,12 +288,23 @@ void InvoiceDialog::addItemRow() {
     tablaItems->setItem(row, col++, qtyItem);
     tablaItems->setItem(row, col++,
         new QTableWidgetItem(QString("$%1").arg(selected.price, 0, 'f', 2)));
+    
+    // Columna 3: Subtotal
+    double lineSubtotal = spnCantidad->value() * selected.price;
+    tablaItems->setItem(row, col++,
+        new QTableWidgetItem(QString("$%1").arg(lineSubtotal, 0, 'f', 2)));
+
+    // Columna 4: Desc. Tipo
     QTableWidgetItem *tipoItem = new QTableWidgetItem();
     tipoItem->setData(Qt::UserRole, "none");
     tablaItems->setItem(row, col++, tipoItem);
+
+    // Columna 5: Desc. Valor
     QTableWidgetItem *valItem = new QTableWidgetItem("0");
     valItem->setData(Qt::UserRole, 0.0);
     tablaItems->setItem(row, col++, valItem);
+
+    // Columna 6: ID
     QTableWidgetItem *idItem = new QTableWidgetItem(QString::number(selected.id));
     tablaItems->setItem(row, col++, idItem);
 
@@ -397,6 +409,12 @@ void InvoiceDialog::updateTotals() {
         double lineTotal = qty * price;
         subtotalSinDesc += lineTotal;
 
+        // Actualizar celda de la columna 3 (Subtotal)
+        QTableWidgetItem *subTotalItem = tablaItems->item(i, 3);
+        if (subTotalItem) {
+            subTotalItem->setText(QString("$%1").arg(lineTotal, 0, 'f', 2));
+        }
+
         QString tipo = tipoItem ? tipoItem->data(Qt::UserRole).toString() : "none";
         double descValor = descItem ? descItem->text().toDouble() : 0.0;
         double finalLine = lineTotal;
@@ -496,4 +514,16 @@ void InvoiceDialog::saveInvoice() {
     } else {
         QMessageBox::warning(this, "Error", result.errorMessage);
     }
+}
+
+void InvoiceDialog::keyPressEvent(QKeyEvent *event) {
+    if (event->key() == Qt::Key_Enter || event->key() == Qt::Key_Return) {
+        QWidget *focused = focusWidget();
+        // Si el foco no está en un botón (QPushButton), ignoramos/swallow el evento
+        if (focused && !focused->inherits("QPushButton")) {
+            event->accept();
+            return;
+        }
+    }
+    QDialog::keyPressEvent(event);
 }

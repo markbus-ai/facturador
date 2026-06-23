@@ -31,4 +31,7 @@ private:
 
     void setupUi(bool editing);
     void populateSuppliers(int selectedId = 0);
+
+protected:
+    void keyPressEvent(QKeyEvent *event) override;
 };

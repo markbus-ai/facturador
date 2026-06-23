@@ -3,6 +3,7 @@
 #include <QHBoxLayout>
 #include <QFormLayout>
 #include <QLabel>
+#include <QKeyEvent>
 #include <QPushButton>
 #include <QMessageBox>
 #include <QMap>
@@ -39,12 +40,12 @@ void ProductDialog::setupUi(bool editing) {
 
     m_name = new QLineEdit(m_product.name);
     m_name->setPlaceholderText("Nombre del producto");
-    m_name->setMaxLength(200);
+    m_name->setMaxLength(100);
     form->addRow("Nombre:", m_name);
 
     m_desc = new QLineEdit(m_product.description);
     m_desc->setPlaceholderText("Descripcion (opcional)");
-    m_name->setMaxLength(500);
+    m_desc->setMaxLength(500);
     form->addRow("Descripcion:", m_desc);
 
     m_price = new QDoubleSpinBox();
@@ -120,4 +121,15 @@ void ProductDialog::populateSuppliers(int selectedId) {
 
 Product ProductDialog::product() const {
     return m_product;
+}
+
+void ProductDialog::keyPressEvent(QKeyEvent *event) {
+    if (event->key() == Qt::Key_Enter || event->key() == Qt::Key_Return) {
+        QWidget *focused = focusWidget();
+        if (focused && !focused->inherits("QPushButton")) {
+            event->accept();
+            return;
+        }
+    }
+    QDialog::keyPressEvent(event);
 }

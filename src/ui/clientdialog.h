@@ -20,4 +20,7 @@ private:
     Client m_client;
 
     void setupUi(bool editing);
+
+protected:
+    void keyPressEvent(QKeyEvent *event) override;
 };

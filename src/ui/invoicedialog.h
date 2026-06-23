@@ -52,4 +52,7 @@ private:
     void saveInvoice();
     void syncItemDiscountControls();
     std::unique_ptr<IDiscountStrategy> crearEstrategiaGlobal() const;
+
+protected:
+    void keyPressEvent(QKeyEvent *event) override;
 };

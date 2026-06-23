@@ -252,6 +252,18 @@ void AdminWindow::setupUsersTab(QVBoxLayout *layout) {
     QHBoxLayout *rolRow = new QHBoxLayout();
     QComboBox *cmbNuevoRol = new QComboBox();
     cmbNuevoRol->addItems({"admin", "user", "repositor"});
+
+    connect(tablaUsuarios, &QTableWidget::currentCellChanged, this,
+            [this, cmbNuevoRol](int row, int, int, int) {
+        if (row >= 0) {
+            auto *roleItem = tablaUsuarios->item(row, 2);
+            if (roleItem) {
+                int rIdx = cmbNuevoRol->findText(roleItem->text());
+                if (rIdx >= 0) cmbNuevoRol->setCurrentIndex(rIdx);
+            }
+        }
+    });
+
     QPushButton *btnCambiarRol = new QPushButton("Aplicar Rol");
     btnCambiarRol->setCursor(Qt::PointingHandCursor);
     connect(btnCambiarRol, &QPushButton::clicked, this, [this, cmbNuevoRol]() {
@@ -268,12 +280,6 @@ void AdminWindow::setupUsersTab(QVBoxLayout *layout) {
         }
         int id = idItem->text().toInt();
         QString userName = nameItem->text();
-
-        auto *roleItem = tablaUsuarios->item(row, 2);
-        if (roleItem) {
-            int rIdx = cmbNuevoRol->findText(roleItem->text());
-            if (rIdx >= 0) cmbNuevoRol->setCurrentIndex(rIdx);
-        }
 
         QString newRole = cmbNuevoRol->currentText();
 

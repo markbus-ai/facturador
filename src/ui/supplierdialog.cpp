@@ -3,6 +3,7 @@
 #include <QHBoxLayout>
 #include <QFormLayout>
 #include <QLabel>
+#include <QKeyEvent>
 #include <QPushButton>
 #include <QMessageBox>
 
@@ -35,7 +36,7 @@ void SupplierDialog::setupUi(bool editing) {
 
     m_name = new QLineEdit(m_supplier.name);
     m_name->setPlaceholderText("Razon social del proveedor");
-    m_name->setMaxLength(200);
+    m_name->setMaxLength(100);
     form->addRow("Nombre:", m_name);
 
     m_contact = new QLineEdit(m_supplier.contact);
@@ -55,7 +56,7 @@ void SupplierDialog::setupUi(bool editing) {
 
     m_address = new QLineEdit(m_supplier.address);
     m_address->setPlaceholderText("Direccion (opcional)");
-    m_address->setMaxLength(5000);
+    m_address->setMaxLength(200);
     form->addRow("Direccion:", m_address);
 
     m_cuit = new QLineEdit(m_supplier.cuit);
@@ -101,4 +102,15 @@ void SupplierDialog::setupUi(bool editing) {
 
 Supplier SupplierDialog::supplier() const {
     return m_supplier;
+}
+
+void SupplierDialog::keyPressEvent(QKeyEvent *event) {
+    if (event->key() == Qt::Key_Enter || event->key() == Qt::Key_Return) {
+        QWidget *focused = focusWidget();
+        if (focused && !focused->inherits("QPushButton")) {
+            event->accept();
+            return;
+        }
+    }
+    QDialog::keyPressEvent(event);
 }

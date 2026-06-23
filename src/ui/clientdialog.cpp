@@ -3,6 +3,7 @@
 #include <QHBoxLayout>
 #include <QFormLayout>
 #include <QLabel>
+#include <QKeyEvent>
 #include <QPushButton>
 #include <QMessageBox>
 
@@ -35,12 +36,12 @@ void ClientDialog::setupUi(bool editing) {
 
     m_name = new QLineEdit(m_client.name);
     m_name->setPlaceholderText("Nombre del cliente");
-    m_name->setMaxLength(200);
+    m_name->setMaxLength(100);
     form->addRow("Nombre:", m_name);
 
     m_address = new QLineEdit(m_client.address);
     m_address->setPlaceholderText("Direccion (opcional)");
-    m_address->setMaxLength(5000);
+    m_address->setMaxLength(200);
     form->addRow("Direccion:", m_address);
 
     m_phone = new QLineEdit(m_client.phone);
@@ -82,4 +83,15 @@ void ClientDialog::setupUi(bool editing) {
 
 Client ClientDialog::client() const {
     return m_client;
+}
+
+void ClientDialog::keyPressEvent(QKeyEvent *event) {
+    if (event->key() == Qt::Key_Enter || event->key() == Qt::Key_Return) {
+        QWidget *focused = focusWidget();
+        if (focused && !focused->inherits("QPushButton")) {
+            event->accept();
+            return;
+        }
+    }
+    QDialog::keyPressEvent(event);
 }

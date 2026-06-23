@@ -23,4 +23,7 @@ private:
     Supplier m_supplier;
 
     void setupUi(bool editing);
+
+protected:
+    void keyPressEvent(QKeyEvent *event) override;
 };
