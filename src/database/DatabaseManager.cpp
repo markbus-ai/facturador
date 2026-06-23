@@ -55,19 +55,13 @@ DatabaseManager::DatabaseManager() {
     {
         QSqlDatabase boot = makeConn("bootstrap", "localhost", "", "");
         if (openDb(boot, errors)) {
-            {
-                QSqlQuery q(boot);
-                if (!q.exec("CREATE DATABASE IF NOT EXISTS facturador "
-                            "DEFAULT CHARACTER SET utf8mb4"))
-                    qDebug() << "Error creando DB:" << q.lastError().text();
-                if (!q.exec("GRANT ALL PRIVILEGES ON facturador.* "
-                            "TO facturador@localhost"))
-                    qDebug() << "Error en GRANT:" << q.lastError().text();
-                if (!q.exec("FLUSH PRIVILEGES"))
-                    qDebug() << "Error en FLUSH:" << q.lastError().text();
-            }
+            QSqlQuery q(boot);
+            q.exec("CREATE DATABASE IF NOT EXISTS facturador "
+                   "DEFAULT CHARACTER SET utf8mb4");
+            q.finish();
             boot.close();
         }
+        boot = QSqlDatabase();
         QSqlDatabase::removeDatabase("bootstrap");
     }
 
