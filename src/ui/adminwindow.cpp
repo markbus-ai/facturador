@@ -1,5 +1,6 @@
 #include "adminwindow.h"
 #include "invoicedialog.h"
+#include "invoiceviewdialog.h"
 #include "productdialog.h"
 #include "clientdialog.h"
 #include "supplierdialog.h"
@@ -114,13 +115,19 @@ void AdminWindow::setupInvoicesTab(QVBoxLayout *layout) {
         showNewInvoiceDialog();
         btnNueva->setEnabled(true);
     });
-    btnRow->addWidget(btnNueva);
+    QPushButton *btnDetalle = new QPushButton("Ver Detalle");
+    btnDetalle->setCursor(Qt::PointingHandCursor);
+    connect(btnDetalle, &QPushButton::clicked, this,
+            &AdminWindow::showInvoiceDetail);
+    btnRow->addWidget(btnDetalle);
     btnRow->addStretch();
     layout->addLayout(btnRow);
 
     tablaFacturas = new QTableWidget(0, 6, this);
     tablaFacturas->setHorizontalHeaderLabels(
         {"ID", "Cliente", "Usuario", "Fecha", "Total", "Items"});
+    connect(tablaFacturas, &QTableWidget::cellDoubleClicked, this,
+            [this](int, int) { showInvoiceDetail(); });
     tablaFacturas->setAccessibleName("Lista de facturas");
     tablaFacturas->horizontalHeader()->setStretchLastSection(true);
     tablaFacturas->setEditTriggers(QAbstractItemView::NoEditTriggers);
@@ -158,6 +165,13 @@ void AdminWindow::setupInvoicesTab(QVBoxLayout *layout) {
 }
 
 void AdminWindow::setupClientsTab(QVBoxLayout *layout) {
+    searchClientes = new QLineEdit();
+    searchClientes->setPlaceholderText("Buscar cliente por nombre, telefono o direccion...");
+    searchClientes->setClearButtonEnabled(true);
+    connect(searchClientes, &QLineEdit::textChanged, this,
+            &AdminWindow::filterClientes);
+    layout->addWidget(searchClientes);
+
     tablaClientes = new QTableWidget(0, 4, this);
     tablaClientes->setHorizontalHeaderLabels(
         {"ID", "Nombre", "Direccion", "Telefono"});
@@ -199,6 +213,13 @@ void AdminWindow::setupClientsTab(QVBoxLayout *layout) {
 }
 
 void AdminWindow::setupSuppliersTab(QVBoxLayout *layout) {
+    searchProveedores = new QLineEdit();
+    searchProveedores->setPlaceholderText("Buscar proveedor por nombre, contacto o CUIT...");
+    searchProveedores->setClearButtonEnabled(true);
+    connect(searchProveedores, &QLineEdit::textChanged, this,
+            &AdminWindow::filterProveedores);
+    layout->addWidget(searchProveedores);
+
     tablaProveedores = new QTableWidget(0, 6, this);
     tablaProveedores->setHorizontalHeaderLabels(
         {"ID", "Nombre", "Contacto", "Telefono", "Email", "CUIT"});
@@ -559,6 +580,55 @@ void AdminWindow::loadSuppliers() {
         tablaProveedores->setItem(row, 4, new QTableWidgetItem(s.email));
         tablaProveedores->setItem(row, 5, new QTableWidgetItem(s.cuit));
     }
+}
+
+void AdminWindow::filterClientes(const QString &text) {
+    for (int i = 0; i < tablaClientes->rowCount(); ++i) {
+        bool match = false;
+        for (int j = 0; j < tablaClientes->columnCount(); ++j) {
+            auto *item = tablaClientes->item(i, j);
+            if (item && item->text().contains(text, Qt::CaseInsensitive)) {
+                match = true;
+                break;
+            }
+        }
+        tablaClientes->setRowHidden(i, !match);
+    }
+}
+
+void AdminWindow::filterProveedores(const QString &text) {
+    for (int i = 0; i < tablaProveedores->rowCount(); ++i) {
+        bool match = false;
+        for (int j = 0; j < tablaProveedores->columnCount(); ++j) {
+            auto *item = tablaProveedores->item(i, j);
+            if (item && item->text().contains(text, Qt::CaseInsensitive)) {
+                match = true;
+                break;
+            }
+        }
+        tablaProveedores->setRowHidden(i, !match);
+    }
+}
+
+void AdminWindow::showInvoiceDetail() {
+    int row = tablaFacturas->currentRow();
+    if (row < 0) {
+        QMessageBox::warning(this, "Error", "Seleccione una factura");
+        return;
+    }
+
+    auto *idItem = tablaFacturas->item(row, 0);
+    if (!idItem) return;
+
+    int id = idItem->text().toInt();
+    auto result = m_billing->findInvoice(id);
+    if (!result.success) {
+        QMessageBox::warning(this, "Error", result.message);
+        return;
+    }
+
+    InvoiceViewDialog dialog(result.value, this);
+    dialog.exec();
 }
 
 void AdminWindow::showAddSupplierDialog() {

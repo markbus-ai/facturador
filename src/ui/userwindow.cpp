@@ -1,5 +1,6 @@
 #include "userwindow.h"
 #include "invoicedialog.h"
+#include "invoiceviewdialog.h"
 #include <QHeaderView>
 #include <QStatusBar>
 #include <QMessageBox>
@@ -47,6 +48,8 @@ UserWindow::UserWindow(const QString &username, int userId,
     tablaFacturas->setEditTriggers(QAbstractItemView::NoEditTriggers);
     tablaFacturas->setSelectionBehavior(QAbstractItemView::SelectRows);
     tablaFacturas->setAlternatingRowColors(false);
+    connect(tablaFacturas, &QTableWidget::cellDoubleClicked, this,
+            [this](int, int) { showInvoiceDetail(); });
     layout->addWidget(tablaFacturas);
 
     QLabel *lblProd = new QLabel("Productos disponibles");
@@ -142,4 +145,22 @@ void UserWindow::showNewInvoiceDialog() {
         loadInvoices();
         loadProducts();
     }
+}
+
+void UserWindow::showInvoiceDetail() {
+    int row = tablaFacturas->currentRow();
+    if (row < 0) return;
+
+    auto *idItem = tablaFacturas->item(row, 0);
+    if (!idItem) return;
+
+    int id = idItem->text().toInt();
+    auto result = m_billing->findInvoice(id);
+    if (!result.success) {
+        QMessageBox::warning(this, "Error", result.message);
+        return;
+    }
+
+    InvoiceViewDialog dialog(result.value, this);
+    dialog.exec();
 }

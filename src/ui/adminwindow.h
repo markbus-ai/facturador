@@ -8,6 +8,7 @@
 #include <QWidget>
 #include <QHBoxLayout>
 #include <QStatusBar>
+#include <QLineEdit>
 #include "core/IAccessContract.h"
 #include "controllers/InventoryController.h"
 #include "controllers/BillingController.h"
@@ -42,6 +43,8 @@ private:
     QTableWidget *tablaProductos;
     QTableWidget *tablaStockReport;
     QTableWidget *tablaProveedores;
+    QLineEdit *searchClientes;
+    QLineEdit *searchProveedores;
 
     void setupInvoicesTab(QVBoxLayout *layout);
     void setupClientsTab(QVBoxLayout *layout);
@@ -56,6 +59,10 @@ private:
     void loadUsers();
     void loadProducts();
     void loadStockReport();
+
+    void filterClientes(const QString &text);
+    void filterProveedores(const QString &text);
+    void showInvoiceDetail();
 
     void showNewInvoiceDialog();
     void showAddProductDialog();
