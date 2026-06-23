@@ -29,7 +29,6 @@ add_executable(facturador
     src/ui/adminwindow.cpp
     src/ui/userwindow.cpp
     src/ui/invoicedialog.cpp
-    src/ui/invoiceviewdialog.cpp
     src/ui/productdialog.cpp
     src/ui/clientdialog.cpp
     src/ui/supplierdialog.cpp

@@ -35,5 +35,4 @@ private:
     void loadInvoices();
     void loadProducts();
     void showNewInvoiceDialog();
-    void showInvoiceDetail();
 };
